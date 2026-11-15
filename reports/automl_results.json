@@ -1,0 +1,286 @@
+{
+  "task_type": "classification",
+  "selection_metric": "f1_weighted",
+  "best_model_id": "c6e970d23ba0",
+  "rows_used": 20,
+  "features": [
+    "age",
+    "income",
+    "city"
+  ],
+  "target": "purchased",
+  "models": [
+    {
+      "id": "c6e970d23ba0",
+      "name": "Logistic Regression",
+      "algorithm": "Logistic Regression",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.9333333333333332,
+      "duration_seconds": 0.06794972399984545,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "b74d77dc7be6",
+      "name": "Decision Tree",
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.9333333333333332,
+      "duration_seconds": 0.05095741900004214,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "1be2d56c05e6",
+      "name": "Random Forest",
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.9333333333333332,
+      "duration_seconds": 1.1004991730001166,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "eb40a43bc61d",
+      "name": "Extra Trees",
+      "algorithm": "Extra Trees",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.7333333333333333,
+      "duration_seconds": 0.8429244950000339,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "8cf8faccad1c",
+      "name": "HistGradientBoosting",
+      "algorithm": "HistGradientBoosting",
+      "metrics": {
+        "accuracy": 0.5,
+        "precision": 0.25,
+        "recall": 0.5,
+        "f1": 0.3333333333333333,
+        "confusion_matrix": [
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 0.5
+      },
+      "cv_score": 0.41999999999999993,
+      "duration_seconds": 0.18206248999990748,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "f81cc7f54a5e",
+      "name": "K-Nearest Neighbors",
+      "algorithm": "K-Nearest Neighbors",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.8666666666666666,
+      "duration_seconds": 0.05409941299990351,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "c3fa37f3ae81",
+      "name": "Support Vector Machine",
+      "algorithm": "Support Vector Machine",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.8133333333333332,
+      "duration_seconds": 0.05291043400006856,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    },
+    {
+      "id": "94e870670ddb",
+      "name": "Gradient Boosting",
+      "algorithm": "Gradient Boosting",
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "confusion_matrix": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "labels": [
+          "no",
+          "yes"
+        ],
+        "roc_auc": 1.0
+      },
+      "cv_score": 0.9333333333333332,
+      "duration_seconds": 0.21646502299995518,
+      "feature_names": [
+        "age",
+        "income",
+        "city"
+      ],
+      "target_name": "purchased"
+    }
+  ]
+}

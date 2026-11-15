@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-automl}
+      POSTGRES_USER: ${POSTGRES_USER:-automl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-automl_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-automl} -d ${POSTGRES_DB:-automl}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  mlflow-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow_dev_password
+    volumes:
+      - mlflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  mlflow:
+    build: ./backend
+    command: >
+      sh -c "mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql://mlflow:mlflow_dev_password@mlflow-db:5432/mlflow
+      --serve-artifacts --artifacts-destination /mlartifacts"
+    ports: ["5000:5000"]
+    volumes:
+      - mlflow_artifacts:/mlartifacts
+    healthcheck:
+      disable: true
+    depends_on:
+      mlflow-db:
+        condition: service_healthy
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://automl:automl_dev_password@db:5432/automl}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-AutoML Forge}
+      UPLOAD_DIR: /app/storage/uploads
+      MODEL_DIR: /app/storage/models
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
+    ports: ["8000:8000"]
+    volumes:
+      - automl_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports: ["5173:80"]
+    depends_on: [api]
+
+volumes:
+  postgres_data:
+  mlflow_db_data:
+  mlflow_artifacts:
+  automl_storage:

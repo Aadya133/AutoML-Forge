@@ -1,0 +1,6 @@
+training:
+  random_state: 42
+  test_size: 0.2
+  cv_folds: 5
+  selection_metric_classification: f1_weighted
+  selection_metric_regression: neg_root_mean_squared_error

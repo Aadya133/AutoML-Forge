@@ -1,0 +1,30 @@
+stages:
+  validate_dataset:
+    cmd: python scripts/validate_dataset.py data/sample_classification.csv
+    deps:
+      - data/sample_classification.csv
+      - scripts/validate_dataset.py
+    outs:
+      - reports/dataset_profile.json
+  train:
+    cmd: python scripts/run_automl.py
+    deps:
+      - data/sample_classification.csv
+      - scripts/run_automl.py
+      - backend/app/automl.py
+      - backend/app/preprocessing.py
+      - backend/app/task_detector.py
+      - backend/app/model_trainer.py
+      - backend/app/model_evaluator.py
+      - backend/app/model_selector.py
+      - backend/app/metrics.py
+      - params.yaml
+    params:
+      - training.test_size
+      - training.cv_folds
+      - training.selection_metric_classification
+    outs:
+      - models/dvc_best_model.joblib
+    metrics:
+      - reports/automl_results.json:
+          cache: false
