@@ -85,7 +85,7 @@ flowchart TD
    - API health: http://localhost:8000/api/health
    - MLflow: http://localhost:5000
 
-The current login is a **demo-only stub** (`demo@automl.local` / `demo123`). It does not provide secure identity, token verification, authorization, or user isolation. Do not deploy this configuration to a public environment.
+The default account is for classroom demonstration (`demo@automl.local` / `demo123`). Login now returns a signed JWT and the dataset, experiment, model, and versioned prediction APIs require it. Set `JWT_SECRET` to a long random value before deployment.
 
 ## Local development
 
@@ -124,12 +124,15 @@ Set `VITE_API_URL` to the API origin when it is not `http://localhost:8000`.
 | GET | `/model-info` | Metadata for the latest selected model |
 | POST | `/predict` | Predict with the latest selected model |
 | GET | `/api/health` | API and database readiness |
-| POST | `/api/auth/login` | Demo login |
+| POST | `/api/auth/login` | Login and receive JWT |
+| POST | `/api/auth/register` | Create a user account |
+| GET | `/api/auth/me` | Inspect the current user |
 | GET | `/api/dashboard` | Dashboard counts and recent experiments |
 | POST | `/api/datasets` | Upload CSV (multipart field `file`) |
 | GET | `/api/datasets` | List datasets |
 | GET | `/api/datasets/{dataset_id}` | Dataset profile and preview |
 | POST | `/api/datasets/{dataset_id}/analyze` | Additional dataset analysis |
+| GET | `/api/models/{model_id}/explain` | Feature importance and ROC/residual data |
 | POST | `/api/experiments` | Queue model training |
 | GET | `/api/experiments` | List experiments |
 | GET | `/api/experiments/{experiment_id}` | Experiment status |
@@ -164,6 +167,8 @@ Configuration is loaded through Pydantic Settings. Important variables:
 | `MODEL_DIR` | Serialized model directory |
 | `MAX_UPLOAD_MB` | CSV upload limit |
 | `CORS_ORIGINS` | JSON array of permitted browser origins |
+| `JWT_SECRET` | Secret used to sign access tokens |
+| `ACCESS_TOKEN_MINUTES` | JWT lifetime |
 | `VITE_API_URL` | API URL embedded in frontend build |
 
 Never commit `.env` or production credentials. `.env.example` contains development defaults only.
@@ -217,13 +222,13 @@ See [`cloud/README.md`](cloud/README.md). The repository contains deployment gui
 
 ## Known limitations
 
-- Authentication remains a demo stub and API routes are not protected.
-- SQLAlchemy tables are created at application startup; Alembic migrations are not yet configured.
-- User, dataset, experiment, and model ownership isolation is not implemented.
+- The default account is intentionally a classroom seed; replace it and configure a strong JWT secret for public deployment.
+- Alembic migrations are included; application startup still uses `create_all` for simple local setup.
+- Dataset ownership is recorded and role checks are available, but a full tenant isolation policy is outside this academic scope.
 - Training runs in FastAPI background tasks and are not durable across restarts.
 - MLflow tracking and registration are best-effort integrations; operational failures are logged.
 - DVC has a local pipeline scaffold but no configured remote.
-- Advanced profiling visualizations, SHAP explainability, drift monitoring, retraining orchestration, and downloadable evaluation reports remain future work.
+- Profiling quality scores, feature importance, ROC data, residual data, and optional SHAP integration remain intentionally lightweight for the academic demo.
 - PostgreSQL, Docker Compose, and frontend production build require an environment with the relevant services and dependencies available.
 
 

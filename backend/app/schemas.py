@@ -5,6 +5,10 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+
+class RegisterRequest(LoginRequest):
+    name: str = Field(min_length=2, max_length=255)
+
 class ExperimentRequest(BaseModel):
     dataset_id: int
     target: str
@@ -16,6 +20,8 @@ class ExperimentRequest(BaseModel):
     selection_metric: str | None = None
     tune: bool = False
     algorithms: list[str] | None = None
+    feature_selection: bool = False
+    balance_classes: bool = False
 
 class PredictionRequest(BaseModel):
     rows: list[dict[str, Any]]

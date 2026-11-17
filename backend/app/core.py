@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     upload_dir: str = "./storage/uploads"
     model_dir: str = "./storage/models"
     max_upload_mb: int = 25
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    jwt_secret: str = "change-this-development-secret"
+    access_token_minutes: int = 60
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

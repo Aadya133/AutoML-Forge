@@ -107,3 +107,11 @@ The supplied archive contains 31 project files. The audit covered the frontend s
 - SQLAlchemy schema changes are not managed by Alembic migrations.
 - A DVC remote and MLflow tracking server/object-store credentials must be configured by the deployment owner.
 - The existing dashboard is React/Vite rather than Streamlit. This was preserved to avoid replacing the working frontend; the required workflow is surfaced through the existing React interface and FastAPI service.
+
+## Semester 2 implementation status
+
+- Added PBKDF2 password hashing, signed JWT login/register/me endpoints, protected API routes, and admin/user role primitives.
+- Added Alembic configuration plus user, dataset-version, and model-version metadata tables.
+- Added Optuna tuning when installed, randomized-search fallback, optional percentile feature selection, and balanced class weights.
+- Added dataset quality scoring, feature importance, ROC curve data, and regression residual data endpoints.
+- Added authenticated frontend requests, training option controls, settings page, frontend smoke test, and a GitHub Actions CD workflow that publishes API/frontend images to GHCR.

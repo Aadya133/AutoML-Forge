@@ -27,8 +27,13 @@ from sklearn.model_selection import (
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.feature_selection import SelectPercentile, f_classif, f_regression
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+try:
+    import optuna
+except ImportError:
+    optuna = None
 
 
 from .task_detector import detect_task as _detect_task
@@ -73,6 +78,17 @@ def make_pipeline(X: pd.DataFrame, estimator) -> Pipeline:
     return Pipeline([("preprocessor", build_preprocessor(X)), ("model", estimator)])
 
 
+def make_enhanced_pipeline(X, estimator, task, feature_selection=False):
+    steps = [("preprocessor", build_preprocessor(X))]
+    if feature_selection:
+        steps.append(("feature_selection", SelectPercentile(
+            score_func=f_classif if task == "classification" else f_regression,
+            percentile=80,
+        )))
+    steps.append(("model", estimator))
+    return Pipeline(steps)
+
+
 def _cv_strategy(task, y_train, requested_folds, random_state=RANDOM_STATE):
     if task == "classification":
         counts = y_train.value_counts()
@@ -93,6 +109,7 @@ def _cv_strategy(task, y_train, requested_folds, random_state=RANDOM_STATE):
 def train_all(
     df, target, excluded, task_type, test_size, cv_folds,
     selection_metric, tune, algorithms, model_dir, random_state=RANDOM_STATE,
+    feature_selection=False, balance_classes=False,
 ):
     if target not in df.columns:
         raise ValueError("Target column does not exist.")
@@ -187,21 +204,41 @@ def train_all(
             estimator = clone(models[name])
             if "random_state" in estimator.get_params(deep=False):
                 estimator.set_params(random_state=random_state)
-            pipe = make_pipeline(X_train, estimator)
+            if balance_classes and task == "classification" and "class_weight" in estimator.get_params(deep=False):
+                estimator.set_params(class_weight="balanced")
+            pipe = make_enhanced_pipeline(X_train, estimator, task, feature_selection)
             if tune and name in ("Random Forest", "Extra Trees"):
-                search_space = {
-                    "model__n_estimators": [100, 150, 200, 300],
-                    "model__max_depth": [None, 5, 10, 20],
-                    "model__min_samples_split": [2, 4, 8],
-                }
-                search = RandomizedSearchCV(
-                    pipe, search_space, n_iter=8, cv=cv, scoring=metric,
-                    n_jobs=-1, random_state=random_state, error_score="raise",
-                )
-                search.fit(X_train, y_train)
-                fitted = search.best_estimator_
-                params_out = search.best_params_
-                cv_score = float(search.best_score_)
+                if optuna is not None:
+                    def objective(trial):
+                        params = {
+                            "model__n_estimators": trial.suggest_int("n_estimators", 100, 250, step=50),
+                            "model__max_depth": trial.suggest_int("max_depth", 4, 20),
+                            "model__min_samples_split": trial.suggest_int("min_samples_split", 2, 8),
+                        }
+                        candidate = clone(pipe).set_params(**params)
+                        return float(np.mean(cross_val_score(
+                            candidate, X_train, y_train, cv=cv, scoring=metric, error_score="raise"
+                        )))
+                    study = optuna.create_study(direction="maximize",
+                                                sampler=optuna.samplers.TPESampler(seed=random_state))
+                    study.optimize(objective, n_trials=6, show_progress_bar=False)
+                    params_out = {f"model__{key}": value for key, value in study.best_params.items()}
+                    fitted = clone(pipe).set_params(**params_out).fit(X_train, y_train)
+                    cv_score = float(study.best_value)
+                else:
+                    search_space = {
+                        "model__n_estimators": [100, 150, 200, 300],
+                        "model__max_depth": [None, 5, 10, 20],
+                        "model__min_samples_split": [2, 4, 8],
+                    }
+                    search = RandomizedSearchCV(
+                        pipe, search_space, n_iter=8, cv=cv, scoring=metric,
+                        n_jobs=-1, random_state=random_state, error_score="raise",
+                    )
+                    search.fit(X_train, y_train)
+                    fitted = search.best_estimator_
+                    params_out = search.best_params_
+                    cv_score = float(search.best_score_)
             else:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -230,11 +267,22 @@ def train_all(
                 if hasattr(fitted, "predict_proba") and len(fitted.classes_) == 2:
                     try:
                         positive_index = list(fitted.classes_).index(fitted.classes_[1])
-                        metrics["roc_auc"] = float(
-                            roc_auc_score(y_test, fitted.predict_proba(X_test)[:, positive_index])
-                        )
+                        probabilities = fitted.predict_proba(X_test)[:, positive_index]
+                        metrics["roc_auc"] = float(roc_auc_score(y_test, probabilities))
+                        from sklearn.metrics import roc_curve
+                        fpr, tpr, thresholds = roc_curve(y_test, probabilities)
+                        metrics["roc_curve"] = {
+                            "fpr": fpr.tolist(), "tpr": tpr.tolist(),
+                            "thresholds": thresholds.tolist(),
+                        }
                     except (ValueError, IndexError):
                         pass
+            else:
+                metrics["residuals"] = {
+                    "actual": y_test.tolist()[:200],
+                    "predicted": predictions.tolist()[:200],
+                    "residual": (y_test.to_numpy() - predictions).tolist()[:200],
+                }
 
             model_id = uuid.uuid4().hex[:12]
             artifact_path = str(Path(model_dir) / f"{model_id}.joblib")
