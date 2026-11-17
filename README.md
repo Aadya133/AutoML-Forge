@@ -2,9 +2,21 @@
 
 An academic AutoML platform built with React, Vite, Tailwind CSS, FastAPI, SQLAlchemy, PostgreSQL, scikit-learn, MLflow, DVC, Docker Compose, and pytest.
 
-> **Project status:** Improved academic starter. The backend AutoML unit tests pass in the current development environment. This is not yet a production-secure multi-user service; see [Audit and limitations](docs/AUDIT.md).
+> **Project status:** Working academic AutoML platform with JWT authentication, training with progress tracking, a voting ensemble, analytics and explainability pages, Docker and CI/CD. It is not a hardened multi-tenant production service; see Known limitations below. [`docs/AUDIT.md`](docs/AUDIT.md) is a historical audit log: its notes about a "demo stub" login are outdated.
 
 ## Features
+
+**Final demo highlights**
+
+- **Analytics page:** dataset quality scores, per-task algorithm performance charts, model comparison with task/algorithm/experiment filters, and prediction history.
+- **Explainability page:** feature importance chart, confusion matrix and ROC curve (classification), residual plot (regression), and a downloadable evaluation report.
+- **Dataset quality score** (0–100, from missing cells and duplicate rows) shown on every dataset profile, together with the dataset version and checksum.
+- **Training progress percentage** with the current step, updated live while an experiment runs.
+- **Voting ensemble:** every run also trains a soft-voting (classification) or averaging (regression) ensemble of the top three models; it can win "best model" like any other.
+- **MLflow UI link** in the sidebar, settings and model cards (`MLFLOW_UI_URL`).
+- Model and dataset version display.
+
+**Platform**
 
 - Modular data ingestion, validation, task detection, preprocessing, training, evaluation, and model selection modules under `backend/app/`.
 - Standard service endpoints: `GET /health`, `GET /model-info`, and `POST /predict`, alongside the versioned `/api/...` routes.
@@ -132,12 +144,16 @@ Set `VITE_API_URL` to the API origin when it is not `http://localhost:8000`.
 | GET | `/api/datasets` | List datasets |
 | GET | `/api/datasets/{dataset_id}` | Dataset profile and preview |
 | POST | `/api/datasets/{dataset_id}/analyze` | Additional dataset analysis |
-| GET | `/api/models/{model_id}/explain` | Feature importance and ROC/residual data |
+| GET | `/api/models/{model_id}/explain` | Feature importance, confusion matrix, ROC and residual data |
+| GET | `/api/models/{model_id}/report` | Downloadable Markdown evaluation report |
+| GET | `/api/analytics` | Dataset quality, algorithm statistics, experiment status counts |
+| GET | `/api/predictions` | Prediction history (optional `model_id`) |
+| GET | `/api/config` | UI configuration such as the MLflow URL |
 | POST | `/api/experiments` | Queue model training |
 | GET | `/api/experiments` | List experiments |
 | GET | `/api/experiments/{experiment_id}` | Experiment status |
 | GET | `/api/experiments/{experiment_id}/models` | Models from an experiment |
-| GET | `/api/models` | List trained models |
+| GET | `/api/models` | List trained models (filter with `task_type`, `algorithm`, `experiment_id`) |
 | GET | `/api/models/{model_id}` | Model metadata |
 | POST | `/api/models/{model_id}/predict` | Predict rows with a saved model |
 
@@ -163,6 +179,7 @@ Configuration is loaded through Pydantic Settings. Important variables:
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Compose PostgreSQL initialization |
 | `MLFLOW_TRACKING_URI` | MLflow tracking endpoint |
 | `MLFLOW_EXPERIMENT_NAME` | Experiment namespace |
+| `MLFLOW_UI_URL` | MLflow address shown as a link in the UI (default `http://localhost:5000`) |
 | `UPLOAD_DIR` | Uploaded dataset directory |
 | `MODEL_DIR` | Serialized model directory |
 | `MAX_UPLOAD_MB` | CSV upload limit |
@@ -214,7 +231,14 @@ cd backend
 pytest -q
 ```
 
-The backend suite covers CSV loading and rejection, dataset profiling, task detection, missing/categorical preprocessing and unseen categories, baseline training, evaluation, best-model persistence, API startup and health.
+The backend suite covers CSV loading and rejection, dataset profiling, task detection, missing/categorical preprocessing and unseen categories, baseline training, the voting ensemble, training progress, evaluation, best-model persistence, API startup and health.
+
+- `tests/test_auth.py`: password hashing, login, registration, duplicate accounts, missing/invalid/expired/forged tokens, inactive users, and admin-only routes.
+- `tests/test_explain.py`: feature importance for tree, linear and ensemble models, end-to-end training through the API, confusion matrix / ROC / residual data, the evaluation report, prediction history and model filtering.
+
+Tests use a throwaway SQLite database and storage folder (`tests/conftest.py`), so they never touch your local data.
+
+Frontend: `cd frontend && npm test && npm run build`.
 
 ## Cloud deployment notes
 
@@ -228,7 +252,8 @@ See [`cloud/README.md`](cloud/README.md). The repository contains deployment gui
 - Training runs in FastAPI background tasks and are not durable across restarts.
 - MLflow tracking and registration are best-effort integrations; operational failures are logged.
 - DVC has a local pipeline scaffold but no configured remote.
-- Profiling quality scores, feature importance, ROC data, residual data, and optional SHAP integration remain intentionally lightweight for the academic demo.
+- Training progress is kept in memory in the API process, so run the API with a single worker (the default) for live percentages.
+- Explanations use model importances or permutation importance; SHAP is optional and not required.
 - PostgreSQL, Docker Compose, and frontend production build require an environment with the relevant services and dependencies available.
 
 
@@ -290,4 +315,11 @@ Open `http://localhost:8000/docs`. The `GET /health` route is suitable for conta
 
 ## CI/CD
 
-GitHub Actions runs backend dependency installation, Python compilation, pytest, and an API Docker image build. A separate frontend job installs npm dependencies and runs the Vite production build on pushes and pull requests.
+GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and pull requests:
+
+- **backend:** dependency install, Python compilation, pytest, API Docker image build.
+- **frontend:** `npm ci`, smoke test, Vite production build.
+- **compose:** builds and starts the Docker Compose stack, waits for the API health check, checks login, then shuts it down.
+- **security:** `pip-audit` on backend requirements and `npm audit` on the frontend (report-only, so a newly published advisory does not block a demo).
+
+`.github/workflows/cd.yml` publishes API and frontend images to GHCR on pushes to `main`.

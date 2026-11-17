@@ -1,5 +1,11 @@
 # Initial audit and implementation report
 
+> **Historical document.** This audit was written while login was still a demo-only stub.
+> That is no longer true: the API now uses PBKDF2 password hashing, signed JWT tokens,
+> protected routes and admin/user roles (see `backend/app/auth.py` and `backend/tests/test_auth.py`).
+> Any line below that calls authentication a "demo stub" or "demo gate" is **outdated** and kept
+> only as a record of how the project evolved. The current feature list is in the README.
+
 ## Scope inspected
 
 The supplied archive contains 31 project files. The audit covered the frontend source and build configuration, FastAPI routes, SQLAlchemy entities and database setup, ML pipeline, schemas and settings, tests, requirements, Dockerfiles, Compose configuration, DVC pipeline, GitHub Actions workflow, sample data, README, and cloud notes.
@@ -102,7 +108,7 @@ The supplied archive contains 31 project files. The audit covered the frontend s
 
 ### Remaining production considerations
 
-- The existing login remains a demo-only stub; it must be replaced with verified authentication and authorization before public deployment.
+- ~~The existing login remains a demo-only stub~~ (outdated: JWT authentication was added in the Semester 2 pass below).
 - Existing background tasks are in-process and not durable across restarts.
 - SQLAlchemy schema changes are not managed by Alembic migrations.
 - A DVC remote and MLflow tracking server/object-store credentials must be configured by the deployment owner.
@@ -115,3 +121,15 @@ The supplied archive contains 31 project files. The audit covered the frontend s
 - Added Optuna tuning when installed, randomized-search fallback, optional percentile feature selection, and balanced class weights.
 - Added dataset quality scoring, feature importance, ROC curve data, and regression residual data endpoints.
 - Added authenticated frontend requests, training option controls, settings page, frontend smoke test, and a GitHub Actions CD workflow that publishes API/frontend images to GHCR.
+
+## Final demo additions
+
+- Analytics page: dataset quality scores, per-task algorithm performance, model comparison with filters, prediction history.
+- Explainability page: feature importance chart (tree importance, coefficients, or permutation importance), confusion matrix and ROC curve for classification, residual plot for regression, downloadable Markdown evaluation report.
+- Dataset quality score and dataset version shown on the dataset profile.
+- Training progress percentage and current step shown while an experiment runs.
+- Voting ensemble (soft voting where possible) built from the top three models of every run.
+- Prediction history table and `/api/predictions` endpoint; model filtering on `/api/models`.
+- MLflow UI link in the sidebar, settings, and model cards.
+- New tests: `test_auth.py` (hashing, login, register, token expiry/tampering, roles) and `test_explain.py` (explanations, plots, report, ensemble, history).
+- CI: Docker Compose smoke test and dependency security scanning.

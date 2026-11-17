@@ -26,3 +26,47 @@ jobs:
         with:
           node-version: "20"
       - run: cd frontend && npm ci && npm test && npm run build
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: docker compose config -q
+      - name: Start stack
+        run: docker compose up -d --build db api frontend
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fs http://localhost:8000/api/health; then echo; exit 0; fi
+            sleep 5
+          done
+          docker compose logs api
+          exit 1
+      - name: Check login and frontend
+        run: |
+          curl -fs -X POST http://localhost:8000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"demo@automl.local","password":"demo123"}' | grep -q access_token
+          curl -fs http://localhost:5173 | grep -q '<div id="root">'
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
+  security:
+    runs-on: ubuntu-latest
+    # Report-only: new advisories for pinned packages should be visible without breaking the build.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt --desc on || echo "::warning::pip-audit found vulnerable Python packages"
+      - name: npm dependency audit
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit found vulnerable packages"
