@@ -22,6 +22,9 @@ from .automl import train_all, detect_task
 from .data_loader import load_csv, DatasetLoadError
 from .data_validator import profile_dataset, validate_target
 
+# MLflow retries unreachable servers for minutes by default; fail fast so training is never blocked.
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "1")
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "5")
 logger = logging.getLogger("automl.api")
 Base.metadata.create_all(bind=engine)
 def ensure_demo_user():
@@ -210,9 +213,15 @@ def run_training(experiment_id: int):
             # Model fitting is the first 90%; saving and registration take the rest.
             TRAINING_PROGRESS[exp.id] = {"percent": int(5 + 85 * done / max(total, 1)), "step": step}
         cfg=json.loads(exp.config)
-        if mlflow is not None:
-            mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-            mlflow.set_experiment(settings.mlflow_experiment_name)
+        use_mlflow = mlflow is not None
+        if use_mlflow:
+            try:
+                mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+                mlflow.set_experiment(settings.mlflow_experiment_name)
+            except Exception:
+                # An unreachable tracking server must not block or fail training.
+                use_mlflow = False
+                logger.exception("MLflow is unreachable; experiment %s will not be tracked.", exp.id)
         else:
             logger.warning("MLflow is not installed; experiment %s will not be tracked.", exp.id)
         result=train_all(dataset_frame(ds),exp.target,cfg["excluded_columns"],exp.task_type,
@@ -226,7 +235,7 @@ def run_training(experiment_id: int):
         for item in result["models"]:
             if "error" in item: continue
             run_id=None
-            if mlflow is not None:
+            if use_mlflow:
                 try:
                     with mlflow.start_run(run_name=item["algorithm"]) as run:
                         run_id=run.info.run_id
@@ -280,7 +289,7 @@ def run_training(experiment_id: int):
                     fig.tight_layout()
                     fig.savefig(chart_path)
                     plt.close(fig)
-                if mlflow is not None:
+                if use_mlflow:
                     try:
                         with mlflow.start_run(run_name="model-comparison"):
                             mlflow.log_artifact(str(report_path))
@@ -293,7 +302,7 @@ def run_training(experiment_id: int):
         exp.best_model_id=model_map.get(result["best_model_id"])
         TRAINING_PROGRESS.pop(exp.id, None)
         exp.status="completed"; exp.task_type=result["task_type"]; db.commit()
-        if exp.best_model_id and mlflow is not None:
+        if exp.best_model_id and use_mlflow:
             best=db.get(ModelRecord,exp.best_model_id)
             try:
                 client=mlflow.tracking.MlflowClient()

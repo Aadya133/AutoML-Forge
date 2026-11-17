@@ -152,3 +152,17 @@ def test_regression_explain_has_residuals(token):
         assert len(residuals["actual"]) == len(residuals["predicted"]) == len(residuals["residual"])
         assert body["plots"]["roc_curve"] is None
         assert {item["feature"] for item in body["feature_importance"]} <= {"size", "rooms"}
+
+
+def test_training_survives_unreachable_mlflow(token, monkeypatch):
+    import app.main as main
+    if main.mlflow is None:
+        pytest.skip("mlflow not installed")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("tracking server down")
+
+    monkeypatch.setattr(main.mlflow, "set_experiment", boom)
+    dataset_id = upload(classification_frame(), token, "mlflow_down.csv")
+    experiment = train(dataset_id, "purchased", token, ["Logistic Regression", "Decision Tree"])
+    assert experiment["best_model_id"] is not None
