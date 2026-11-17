@@ -71,3 +71,13 @@ class ModelVersion(Base):
     version = Column(Integer, nullable=False)
     artifact_path = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PredictionLog(Base):
+    __tablename__ = "predictions"
+    id = Column(Integer, primary_key=True, index=True)
+    model_id = Column(Integer, ForeignKey("models.id"), nullable=False, index=True)
+    user_email = Column(String(255), nullable=True)
+    inputs = Column(Text, default="[]")
+    outputs = Column(Text, default="[]")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -13,6 +13,7 @@ from sklearn.ensemble import (
     GradientBoostingClassifier, GradientBoostingRegressor,
     HistGradientBoostingClassifier, HistGradientBoostingRegressor,
     RandomForestClassifier, RandomForestRegressor,
+    VotingClassifier, VotingRegressor,
 )
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Lasso, LinearRegression, LogisticRegression, Ridge
@@ -106,11 +107,68 @@ def _cv_strategy(task, y_train, requested_folds, random_state=RANDOM_STATE):
     )
 
 
+def _test_metrics(fitted, X_test, y_test, task, name, duration):
+    """Test-set metrics plus the data needed for ROC / confusion matrix / residual plots."""
+    comparison = evaluate_models(
+        [{"name": name, "pipeline": fitted, "duration_seconds": duration, "error": None}],
+        X_test, y_test, task,
+    )
+    evaluated = comparison.iloc[0].to_dict()
+    metric_names = ("accuracy", "precision", "recall", "f1") if task == "classification" else ("r2", "mae", "mse", "rmse")
+    metrics = {key: float(evaluated[key]) for key in metric_names if key in evaluated and pd.notna(evaluated[key])}
+    predictions = fitted.predict(X_test)
+    if task == "classification":
+        metrics.update({
+            "confusion_matrix": confusion_matrix(y_test, predictions, labels=fitted.classes_).tolist(),
+            "labels": [str(value) for value in fitted.classes_],
+        })
+        if hasattr(fitted, "predict_proba") and len(fitted.classes_) == 2:
+            try:
+                probabilities = fitted.predict_proba(X_test)[:, 1]
+                metrics["roc_auc"] = float(roc_auc_score(y_test, probabilities))
+                from sklearn.metrics import roc_curve
+                fpr, tpr, thresholds = roc_curve(y_test, probabilities, pos_label=fitted.classes_[1])
+                metrics["roc_curve"] = {
+                    "fpr": fpr.tolist(), "tpr": tpr.tolist(),
+                    "thresholds": [float(t) if np.isfinite(t) else 1.0 for t in thresholds],
+                }
+            except (ValueError, IndexError):
+                pass
+    else:
+        metrics["residuals"] = {
+            "actual": y_test.tolist()[:200],
+            "predicted": predictions.tolist()[:200],
+            "residual": (y_test.to_numpy() - predictions).tolist()[:200],
+        }
+    return metrics
+
+
+def build_voting_ensemble(fitted_pipelines, task):
+    """Simple voting ensemble over already-configured pipelines (soft voting when possible)."""
+    members = [(f"m{i}", clone(pipe)) for i, pipe in enumerate(fitted_pipelines)]
+    if task == "classification":
+        soft = all(hasattr(pipe, "predict_proba") for _, pipe in members)
+        return VotingClassifier(members, voting="soft" if soft else "hard")
+    return VotingRegressor(members)
+
+
 def train_all(
     df, target, excluded, task_type, test_size, cv_folds,
     selection_metric, tune, algorithms, model_dir, random_state=RANDOM_STATE,
-    feature_selection=False, balance_classes=False,
+    feature_selection=False, balance_classes=False, ensemble=True, progress_callback=None,
 ):
+    """Train every candidate, add a voting ensemble of the top three, and pick the best.
+
+    ``progress_callback(done, total, step_name)`` is called after each step so the API can
+    show a training progress percentage.
+    """
+    def report(done, total, step):
+        if progress_callback is not None:
+            try:
+                progress_callback(done, total, step)
+            except Exception:
+                pass
+
     if target not in df.columns:
         raise ValueError("Target column does not exist.")
     if not 0.05 < float(test_size) < 0.5:
@@ -198,7 +256,10 @@ def train_all(
 
     Path(model_dir).mkdir(parents=True, exist_ok=True)
     results = []
-    for name in selected:
+    fitted_by_id = {}
+    total_steps = len(selected) + (1 if ensemble and len(selected) >= 2 else 0)
+    report(0, total_steps, "starting")
+    for step, name in enumerate(selected, start=1):
         started = time.perf_counter()
         try:
             estimator = clone(models[name])
@@ -251,38 +312,7 @@ def train_all(
                 params_out = fitted.named_steps["model"].get_params()
 
             duration = time.perf_counter() - started
-            comparison = evaluate_models(
-                [{"name": name, "pipeline": fitted, "duration_seconds": duration, "error": None}],
-                X_test, y_test, task,
-            )
-            evaluated = comparison.iloc[0].to_dict()
-            metric_names = ("accuracy", "precision", "recall", "f1") if task == "classification" else ("r2", "mae", "mse", "rmse")
-            metrics = {key: float(evaluated[key]) for key in metric_names if key in evaluated and pd.notna(evaluated[key])}
-            predictions = fitted.predict(X_test)
-            if task == "classification":
-                metrics.update({
-                    "confusion_matrix": confusion_matrix(y_test, predictions, labels=fitted.classes_).tolist(),
-                    "labels": [str(value) for value in fitted.classes_],
-                })
-                if hasattr(fitted, "predict_proba") and len(fitted.classes_) == 2:
-                    try:
-                        positive_index = list(fitted.classes_).index(fitted.classes_[1])
-                        probabilities = fitted.predict_proba(X_test)[:, positive_index]
-                        metrics["roc_auc"] = float(roc_auc_score(y_test, probabilities))
-                        from sklearn.metrics import roc_curve
-                        fpr, tpr, thresholds = roc_curve(y_test, probabilities)
-                        metrics["roc_curve"] = {
-                            "fpr": fpr.tolist(), "tpr": tpr.tolist(),
-                            "thresholds": thresholds.tolist(),
-                        }
-                    except (ValueError, IndexError):
-                        pass
-            else:
-                metrics["residuals"] = {
-                    "actual": y_test.tolist()[:200],
-                    "predicted": predictions.tolist()[:200],
-                    "residual": (y_test.to_numpy() - predictions).tolist()[:200],
-                }
+            metrics = _test_metrics(fitted, X_test, y_test, task, name, duration)
 
             model_id = uuid.uuid4().hex[:12]
             artifact_path = str(Path(model_dir) / f"{model_id}.joblib")
@@ -294,8 +324,37 @@ def train_all(
                 "feature_names": list(X.columns), "target_name": target,
                 "params": str(params_out),
             })
+            fitted_by_id[model_id] = fitted
         except Exception as exc:
             results.append({"name": name, "algorithm": name, "error": str(exc)})
+        report(step, total_steps, name)
+
+    good = [item for item in results if "error" not in item]
+    if ensemble and len(good) >= 2:
+        top = sorted(good, key=lambda item: item["cv_score"], reverse=True)[:3]
+        started = time.perf_counter()
+        try:
+            voter = build_voting_ensemble([fitted_by_id[item["id"]] for item in top], task)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                scores = cross_val_score(voter, X_train, y_train, cv=cv, scoring=metric, error_score="raise")
+                voter.fit(X_train, y_train)
+            duration = time.perf_counter() - started
+            model_id = uuid.uuid4().hex[:12]
+            artifact_path = str(Path(model_dir) / f"{model_id}.joblib")
+            joblib.dump(voter, artifact_path)
+            results.append({
+                "id": model_id, "name": "Voting Ensemble", "algorithm": "Voting Ensemble",
+                "metrics": _test_metrics(voter, X_test, y_test, task, "Voting Ensemble", duration),
+                "cv_score": float(np.mean(scores)), "duration_seconds": duration,
+                "artifact_path": artifact_path, "feature_names": list(X.columns),
+                "target_name": target,
+                "params": "members: " + ", ".join(item["algorithm"] for item in top),
+                "members": [item["algorithm"] for item in top],
+            })
+        except Exception as exc:
+            results.append({"name": "Voting Ensemble", "algorithm": "Voting Ensemble", "error": str(exc)})
+        report(total_steps, total_steps, "Voting Ensemble")
 
     eligible = [item for item in results if "error" not in item]
     if not eligible:

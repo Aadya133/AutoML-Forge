@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./automl.db"
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment_name: str = "AutoML Forge"
+    mlflow_ui_url: str = "http://localhost:5000"
     upload_dir: str = "./storage/uploads"
     model_dir: str = "./storage/models"
     max_upload_mb: int = 25
