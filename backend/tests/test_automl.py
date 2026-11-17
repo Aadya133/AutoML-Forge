@@ -49,3 +49,36 @@ def test_rejects_missing_target(tmp_path):
     with pytest.raises(ValueError, match="Target column"):
         train_all(pd.DataFrame({"x": [1] * 20}), "missing", [], "auto",
                   0.2, 3, None, False, None, str(tmp_path))
+
+
+def _frame():
+    return pd.DataFrame({
+        "age": list(range(20, 60)),
+        "city": ["A", "B", "A", "C"] * 10,
+        "target": [0, 1] * 20,
+    })
+
+
+def test_train_all_adds_voting_ensemble(tmp_path):
+    result = train_all(_frame(), "target", [], "auto", 0.2, 3, None, False,
+                       ["Logistic Regression", "Decision Tree"], str(tmp_path))
+    ensemble = next(m for m in result["models"] if m["algorithm"] == "Voting Ensemble")
+    assert "error" not in ensemble
+    assert set(ensemble["members"]) == {"Logistic Regression", "Decision Tree"}
+    assert "accuracy" in ensemble["metrics"]
+
+
+def test_ensemble_can_be_disabled(tmp_path):
+    result = train_all(_frame(), "target", [], "auto", 0.2, 3, None, False,
+                       ["Logistic Regression", "Decision Tree"], str(tmp_path), ensemble=False)
+    assert "Voting Ensemble" not in [m["algorithm"] for m in result["models"]]
+
+
+def test_progress_callback_reaches_total(tmp_path):
+    calls = []
+    train_all(_frame(), "target", [], "auto", 0.2, 3, None, False,
+              ["Logistic Regression", "Decision Tree"], str(tmp_path),
+              progress_callback=lambda done, total, step: calls.append((done, total, step)))
+    assert calls[0][0] == 0
+    assert calls[-1][0] == calls[-1][1] == 3
+    assert [c[0] for c in calls] == sorted(c[0] for c in calls)

@@ -49,6 +49,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://automl:automl_dev_password@db:5432/automl}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
       MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-AutoML Forge}
+      MLFLOW_UI_URL: ${MLFLOW_UI_URL:-http://localhost:5000}
       UPLOAD_DIR: /app/storage/uploads
       MODEL_DIR: /app/storage/models
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}

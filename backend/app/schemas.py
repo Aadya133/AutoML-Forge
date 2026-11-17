@@ -22,6 +22,7 @@ class ExperimentRequest(BaseModel):
     algorithms: list[str] | None = None
     feature_selection: bool = False
     balance_classes: bool = False
+    ensemble: bool = True
 
 class PredictionRequest(BaseModel):
     rows: list[dict[str, Any]]
