@@ -6,7 +6,7 @@ An academic AutoML platform built with React, Vite, Tailwind CSS, FastAPI, SQLAl
 
 ## Features
 
-**Final demo highlights**
+**highlights**
 
 - **Analytics page:** dataset quality scores, per-task algorithm performance charts, model comparison with task/algorithm/experiment filters, and prediction history.
 - **Explainability page:** feature importance chart, confusion matrix and ROC curve (classification), residual plot (regression), and a downloadable evaluation report.

@@ -97,4 +97,5 @@ export default function Analytics({ models, onExplain, setNotice }) {
         : <p className="muted">No predictions yet. Use the Models page to make one.</p>}
     </section>
   </div>;
+  
 }
