@@ -2,7 +2,7 @@
 
 An academic AutoML platform built with React, Vite, Tailwind CSS, FastAPI, SQLAlchemy, PostgreSQL, scikit-learn, MLflow, DVC, Docker Compose, and pytest.
 
-> **Project status:** Working academic AutoML platform with JWT authentication, training with progress tracking, a voting ensemble, analytics and explainability pages, Docker and CI/CD. It is not a hardened multi-tenant production service; see Known limitations below. [`docs/AUDIT.md`](docs/AUDIT.md) is a historical audit log: its notes about a "demo stub" login are outdated.
+> **Project status:** Working academic AutoML platform with JWT authentication, training with progress tracking, a voting ensemble, analytics and explainability pages, Docker and CI/CD.
 
 ## Features
 
